@@ -1,0 +1,5 @@
+[package]
+name = "models"
+version = "0.1.0"
+authors = ["val500 <varun.valada@gmail.com>"]
+edition = "2018"
