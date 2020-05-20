@@ -128,6 +128,20 @@ impl<T: Clone + Attribute> Attribute for ScheduleEntry<T> {
     }
 }
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct JsonSchedule<T> where T: Clone + Attribute {
+    entries: Vec<ScheduleEntry<T>>
+}
+
+impl<T> JsonSchedule<T> where T: Clone + Attribute {
+    pub fn create_schedule(&self, id: String) -> Schedule<T> {
+        Schedule {
+            id: id,
+            entries: self.entries.clone(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Schedule<T> where T: Clone + Attribute {
     id: String,
@@ -169,11 +183,6 @@ impl<T> Schedule<T> where T: Clone + Attribute {
         self.entries = temp;
     }
 }
-
-impl Schedule<String> {
-    
-}
-
 impl<T: Clone + Attribute> Item for Schedule<T> {
     fn key(&self) -> Attributes {
         let mut attrs = HashMap::new();
@@ -202,7 +211,7 @@ impl<T: Clone + Attribute> FromAttributes for Schedule<T> {
 impl<T: Clone + Attribute> Into<Attributes> for Schedule<T> {
     fn into(self: Self) -> Attributes {
         let mut attrs = HashMap::new();
-        attrs.insert("id".into(), self.id.into_attr());
+        attrs.insert("userId".into(), self.id.into_attr());
         attrs.insert("entries".into(), self.entries.into_attr());
         attrs
     }

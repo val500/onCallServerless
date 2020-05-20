@@ -34,7 +34,7 @@ pub fn deserialize<'a, T: DeserializeOwned, D: Deserializer<'a>>(
 pub struct LambdaRequest<Data: DeserializeOwned> {
     #[serde(deserialize_with = "deserialize")]
     body: Data,
-    request_context: RequestContext
+    pub request_context: RequestContext
 }
 
 impl<Data: DeserializeOwned> LambdaRequest<Data> {
@@ -45,14 +45,14 @@ impl<Data: DeserializeOwned> LambdaRequest<Data> {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct RequestContext {
-    identity: Identity
+pub struct RequestContext {
+    pub identity: Identity
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-struct Identity {
-    cognito_identity_id: String
+pub struct Identity {
+    pub cognito_identity_id: String
 }
 
 /// The outgoing data that is being passed from our lambda to AWS. AWS API Gateway expects at least

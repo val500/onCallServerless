@@ -6,9 +6,25 @@ provider:
     name: aws
     runtime: rust
 
+    iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:us-east-2:525480555872:table/OpenSchedule"
+
+custom:
+  rust:
+    dockerTag: '0.2.7-rust-1.43.0'
 # To automate building and deployment, we'll use a plugin specifically made for Rust.
 plugins:
     - serverless-rust
+    - serverless-dotenv-plugin
 
 # This tells the framework to package each function separately with its own container.
 package:

@@ -1,5 +1,5 @@
 {
-    "body": "{\"uuid\": \"42\", \"entries\": [{\"time_range\": {\"start_time\": \"2002-10-02T15:00:00Z\", \"end_time\": \"2003-10-02T15:00:00Z\"}, \"meta_data\": \"Open\"}, {\"time_range\": {\"start_time\": \"2004-10-02T15:00:00Z\", \"end_time\": \"2005-10-02T15:00:00Z\"}, \"meta_data\": \"Open\"}]}",
+    "body": "{\"entries\": [{\"time_range\": {\"start_time\": \"2002-10-02T15:00:00Z\", \"end_time\": \"2003-10-02T15:00:00Z\"}, \"meta_data\": \"Open\"}, {\"time_range\": {\"start_time\": \"2004-10-02T15:00:00Z\", \"end_time\": \"2005-10-02T15:00:00Z\"}, \"meta_data\": \"Open\"}]}",
     "requestContext": {
         "identity": {
             "cognitoIdentityId": "USER-SUB-1234"

@@ -9,8 +9,9 @@ edition = "2018"
 [dependencies]
 serde = { version = "1.0.106", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
-dynomite = "0.7"
+dynomite = "0.8.0"
 futures = "0.3.5"
 tokio = { version = "0.2", features = ["rt-core"] }
 rusoto_core = "0.43"
 rusoto_dynamodb = "0.43"
+again = "0.1.0"
