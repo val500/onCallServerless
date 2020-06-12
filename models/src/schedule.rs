@@ -5,11 +5,32 @@ use crate::users::User;
 use chrono::{offset::FixedOffset, DateTime, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use std::iter::Iterator;
+use dynomite::{Item, Attribute, Attributes,
+               dynamodb::{AttributeValue},
+               error::{AttributeError}};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Entry {
     range: ClosedRange<DateTime<FixedOffset>>,
     providers: Vec<User>,
+}
+
+impl Attribute for Entry {
+    fn into_attr(self) -> AttributeValue {
+        AttributeValue {
+            l: Some(vec![self.range.into_attr(), self.providers.into_attr()]),
+            ..AttributeValue::default()
+        }
+    }
+    fn from_attr(value: AttributeValue) -> Result<Self, AttributeError> {
+        match value.l {
+            Some(l) => Ok(Entry {
+                range: ClosedRange::<DateTime<FixedOffset>>::from_attr(l[0].clone())?,
+                providers: Vec::<User>::from_attr(l[1].clone())?,
+            }),
+            None => Err(AttributeError::InvalidType),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -162,8 +183,9 @@ fn merge_into(entries: &Vec<Entry>, entry: Entry) -> Vec<Entry> {
         }
     }
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Item)]
 pub struct Schedule {
+    #[dynomite(partition_key)]
     group_id: String,
     entries: Vec<Entry>,
 }

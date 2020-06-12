@@ -1,6 +1,6 @@
+use dynomite::{dynamodb::AttributeValue, Attribute, AttributeError, Item};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-
 fn option_cmp<T: PartialOrd + Ord>(first: Option<&T>, second: Option<&T>) -> Ordering {
     match first {
         Some(t) => match second {
@@ -66,12 +66,31 @@ pub trait Range<T: PartialOrd + Eq + Ord>: Clone + Sized {
 }
 
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
-pub struct ClosedRange<T: PartialOrd + Eq + Clone + Ord> {
+pub struct ClosedRange<T: PartialOrd + Eq + Clone + Ord + Attribute> {
     pub start: T,
     pub end: T,
 }
 
-impl<T: PartialOrd + Ord + Eq + Clone> Range<T> for ClosedRange<T> {
+impl<T: PartialOrd + Eq + Clone + Ord + Attribute> Attribute for ClosedRange<T> {
+    fn into_attr(self) -> AttributeValue {
+        AttributeValue {
+            l: Some(vec![self.start.into_attr(), self.end.into_attr()]),
+            ..AttributeValue::default()
+        }
+    }
+
+    fn from_attr(value: AttributeValue) -> Result<Self, AttributeError> {
+        match value.l {
+            Some(l) => Ok(ClosedRange::new_closed_range(
+                &T::from_attr(l[0].clone())?,
+                &T::from_attr(l[1].clone())?,
+            )),
+            None => Err(AttributeError::InvalidType),
+        }
+    }
+}
+
+impl<T: PartialOrd + Ord + Eq + Clone + Attribute> Range<T> for ClosedRange<T> {
     fn start(&self) -> T {
         self.start.clone()
     }
@@ -90,7 +109,7 @@ impl<T: PartialOrd + Ord + Eq + Clone> Range<T> for ClosedRange<T> {
     }
 }
 
-impl<T: PartialOrd + Ord + Eq + Clone> ClosedRange<T> {
+impl<T: PartialOrd + Ord + Eq + Clone + Attribute> ClosedRange<T> {
     pub fn new_closed_range(start: &T, end: &T) -> ClosedRange<T> {
         ClosedRange::<T>::new_range(start, &Some(end.clone()))
     }
