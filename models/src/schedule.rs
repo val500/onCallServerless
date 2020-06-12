@@ -1,218 +1,169 @@
 extern crate chrono;
-extern crate dynomite;
-use std::str::FromStr;
-use std::collections::HashMap;
-use chrono::{DateTime, Utc};
-use std::cmp::Ordering;
-use std::vec::Vec;
-use serde::{Serialize, Deserialize};
-use dynomite::{Item, Attribute, FromAttributes, Attributes,
-               dynamodb::{AttributeValue},
-               error::{AttributeError}};
+use crate::range::{ClosedRange, OpenRange, Range};
+use crate::time::TimeOfDayDuration;
+use crate::users::User;
+use chrono::{offset::FixedOffset, DateTime, NaiveDateTime};
+use serde::{Deserialize, Serialize};
+use std::iter::Iterator;
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
-enum Label {
-    Open,
-    Closed,
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct Entry {
+    range: ClosedRange<DateTime<FixedOffset>>,
+    providers: Vec<User>,
 }
 
-#[derive(PartialEq, Eq, Copy, Clone, Serialize, Deserialize, Debug)]
-pub struct Range {
-    start_time: DateTime<Utc>,
-    end_time: Option<DateTime<Utc>>,
+#[derive(Debug, Clone)]
+pub struct ScheduleSlot {
+    interval: OpenRange<NaiveDateTime>,
+    restriction: TimeOfDayDuration,
+    providers: Vec<User>,
 }
 
-impl PartialOrd for Range {
-    fn partial_cmp(&self, other: &Range) -> Option<Ordering> {
-        if self.overlaps(other) {
-            None
-        } else {
-            if self.start_time < other.start_time {
-                Some(Ordering::Less)
-            } else {
-                Some(Ordering::Greater)
+impl ScheduleSlot {
+    fn to_iter<'a>(&'a self, offset: &'a FixedOffset) -> Box<dyn Iterator<Item = Entry> + 'a> {
+        let start = self.interval.start;
+        let end_option = self.interval.end;
+        match end_option {
+            Some(end) => {
+                let zoned_end: DateTime<FixedOffset> =
+                    DateTime::<FixedOffset>::from_utc(end.clone(), *offset);
+                let clone_1 = zoned_end.clone();
+                let clone_2 = zoned_end.clone();
+                let iter = self
+                    .restriction
+                    .to_iter(&start, offset)
+                    .take_while(move |range| range.start < clone_1)
+                    .map(move |range| {
+                        let ze = clone_2;
+                        if range.contains(Some(&ze)) {
+                            Entry {
+                                range: ClosedRange {
+                                    start: range.start,
+                                    end: ze,
+                                },
+                                providers: self.providers.clone(),
+                            }
+                        } else {
+                            Entry {
+                                range,
+                                providers: self.providers.clone(),
+                            }
+                        }
+                    });
+                Box::new(iter)
+            }
+            None => {
+                let self_clone = self.clone();
+                let iter = self
+                    .restriction
+                    .to_iter(&start, offset)
+                    .map(move |range| Entry {
+                        range,
+                        providers: self_clone.providers.clone(),
+                    });
+                Box::new(iter)
             }
         }
     }
 }
-impl Range {
-    fn contains(&self, ot: &Option<DateTime<Utc>>) -> bool {
-        match ot {
-            Some(t) => 
-                match self.end_time {
-                    Some(et) => t < &et && t >= &self.start_time,
-                    None => t >= &self.start_time,
-                }
-            None => false
-        }
-    }
 
-    fn overlaps(&self, r2: &Range) -> bool {
-        self.contains(&Some(r2.start_time)) || self.contains(&r2.end_time) || r2.contains(&Some(self.start_time)) || r2.contains(&self.end_time)
-    }
-
-}
-
-impl Attribute for Range {
-    fn into_attr(self) -> AttributeValue {
-        match self.end_time {
-            Some(t) =>
-                AttributeValue {
-                    ss: Some(vec![self.start_time.to_rfc3339(), t.to_rfc3339()]),
-                    ..AttributeValue::default()
-                },
-            None =>
-                AttributeValue {
-                    s: Some(self.start_time.to_rfc3339()),
-                    ..AttributeValue::default()
-                }
-        }
-    }
-
-    fn from_attr(value: AttributeValue) -> Result<Self, AttributeError> {
-        match value.ss {
-            Some(ss) =>
-                Ok(Range {
-                    start_time:
-                    match DateTime::<Utc>::from_str(&ss[0]) {
-                        Ok(t) => t,
-                        Err(e) => return Err(AttributeError::InvalidType)
-                    },
-                    end_time:
-                    match DateTime::<Utc>::from_str(&ss[1]) {
-                        Ok(t) => Some(t),
-                        Err(e) => return Err(AttributeError::InvalidType)
-                    },
-                }),
-            None =>
-                match value.s {
-                    Some(s) =>
-                        Ok(Range {
-                            start_time:
-                            match DateTime::<Utc>::from_str(&s) {
-                                Ok(t) => t,
-                                Err(e) => return Err(AttributeError::InvalidType)
-                            },
-                            end_time: None,
-                        }),
-                    None => Err(AttributeError::InvalidType)
-                }
-                
-        }
-    }
-}
-
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
-pub struct ScheduleEntry<T: Clone + Attribute> {
-    time_range: Range,
-    meta_data: T,
-}
-
-impl<T: Clone + Attribute> Attribute for ScheduleEntry<T> {
-    fn into_attr(self) -> AttributeValue {
-        AttributeValue {
-            l: Some(vec![self.time_range.into_attr(), self.meta_data.into_attr()]),
-            ..AttributeValue::default()
-        }
-    }
-
-    fn from_attr(value: AttributeValue) -> Result<Self, AttributeError> {
-        match value.l {
-            Some(v) =>
-                Ok(ScheduleEntry {
-                    time_range: Range::from_attr(v[0].clone())?,
-                    meta_data: T::from_attr(v[1].clone())?,
-                }),
-            None => Err(AttributeError::InvalidType)
-        }
-    }
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct JsonSchedule<T> where T: Clone + Attribute {
-    entries: Vec<ScheduleEntry<T>>
-}
-
-impl<T> JsonSchedule<T> where T: Clone + Attribute {
-    pub fn create_schedule(&self, id: String) -> Schedule<T> {
-        Schedule {
-            id: id,
-            entries: self.entries.clone(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Schedule<T> where T: Clone + Attribute {
-    id: String,
-    entries: Vec<ScheduleEntry<T>>,
-}
-
-impl<T> Schedule<T> where T: Clone + Attribute {
-    fn get_entry(&self, time: DateTime<Utc>) -> Option<&ScheduleEntry<T>> {
-        for entry in &self.entries {
-            if entry.time_range.contains(&Some(time)) {
-                return Some(entry)
-            }
-        }
-        return None
-    }
-    fn insert_entry(&mut self, se: ScheduleEntry<T>) {
-        let mut temp = Vec::new();
-        let mut inserted = false;
-        if se.time_range < self.entries[0].time_range {
-            temp.push(se.clone());
-            inserted = true;
-        }
-        for entry in &self.entries {
-            if entry.time_range.overlaps(&se.time_range) {
-                if !inserted {
-                    temp.push(se.clone());
-                    inserted = true;
-                }
-            } else {
-                if se.time_range > entry.time_range && !inserted {
-                    temp.push(entry.clone());
-                    temp.push(se.clone());
-                    inserted = true;
-                } else {
-                    temp.push(entry.clone());
-                }
-            }
-        }
-        self.entries = temp;
-    }
-}
-impl<T: Clone + Attribute> Item for Schedule<T> {
-    fn key(&self) -> Attributes {
-        let mut attrs = HashMap::new();
-        attrs.insert("id".into(), self.id.clone().into_attr());
-        attrs
-    }
-}
-
-impl<T: Clone + Attribute> FromAttributes for Schedule<T> {
-    fn from_attrs(attrs: Attributes) -> Result<Self, AttributeError> {
-        Ok(Self {
-            id: attrs
-                .get("id")
-                .and_then(|val| val.s.clone())
-                .ok_or(AttributeError::MissingField { name: "id".into() })?,
-            entries: attrs
-                .get("entries")
-                .and_then(|val| val.l.clone())
-                .ok_or(AttributeError::MissingField { name: "entries".into() })?
-                .iter().map(|x| ScheduleEntry::from_attr(x.clone()))
-                .collect::<Result<Vec<ScheduleEntry<T>>, AttributeError>>()?,
+pub fn generate_schedule(
+    slots: Vec<ScheduleSlot>,
+    start: NaiveDateTime,
+    end: NaiveDateTime,
+    offset: FixedOffset,
+    group_id: String,
+) -> Schedule {
+    let schedule_range = OpenRange::new_open_range(&start, &Some(end));
+    let entries: Vec<Vec<Entry>> = slots
+        .iter()
+        .filter(|slot| slot.interval.intersection(&schedule_range) != None)
+        .map(|slot| {
+            let mut new_slot = slot.clone();
+            new_slot.interval = new_slot.interval.intersection(&schedule_range).unwrap();
+            new_slot.to_iter(&offset).collect::<Vec<_>>()
         })
+        .collect();
+    Schedule {
+        group_id,
+        entries: merge_entries(entries),
     }
 }
 
-impl<T: Clone + Attribute> Into<Attributes> for Schedule<T> {
-    fn into(self: Self) -> Attributes {
-        let mut attrs = HashMap::new();
-        attrs.insert("userId".into(), self.id.into_attr());
-        attrs.insert("entries".into(), self.entries.into_attr());
-        attrs
+fn merge_entries(entries: Vec<Vec<Entry>>) -> Vec<Entry> {
+    let mut new_entries: Vec<Entry> = Vec::new();
+    for vec_entry in entries {
+        for entry in vec_entry {
+            new_entries = merge_into(&new_entries, entry);
+        }
     }
+    new_entries
+}
+
+fn merge_into(entries: &Vec<Entry>, entry: Entry) -> Vec<Entry> {
+    let overlapped_index = entries.iter().position(|e| e.range.overlaps(&entry.range));
+    match overlapped_index {
+        Some(o) => {
+            let overlapped = entries[o].clone();
+            let mut new_entries: Vec<Entry> = entries.to_vec();
+            new_entries.remove(o);
+            let mut bounds = vec![
+                entry.range.start,
+                entry.range.end,
+                overlapped.range.start,
+                overlapped.range.end,
+            ];
+            bounds.sort();
+            if entry.range.start != overlapped.range.start {
+                new_entries = merge_into(
+                    &new_entries,
+                    Entry {
+                        range: ClosedRange::new_closed_range(&bounds[0], &bounds[1]),
+                        providers: if entry.range.start < overlapped.range.start {
+                            entry.providers.to_vec()
+                        } else {
+                            overlapped.providers.to_vec()
+                        },
+                    },
+                );
+            }
+
+            new_entries = merge_into(
+                &new_entries,
+                Entry {
+                    range: ClosedRange::new_closed_range(&bounds[1], &bounds[2]),
+                    providers: {
+                        let mut new_entry = entry.providers.to_vec();
+                        new_entry.append(&mut overlapped.providers.to_vec());
+                        new_entry
+                    },
+                },
+            );
+
+            if entry.range.end != overlapped.range.end {
+                new_entries = merge_into(
+                    &new_entries,
+                    Entry {
+                        range: ClosedRange::new_closed_range(&bounds[2], &bounds[3]),
+                        providers: if entry.range.end > overlapped.range.end {
+                            entry.providers.to_vec()
+                        } else {
+                            overlapped.providers.to_vec()
+                        },
+                    },
+                )
+            }
+            new_entries
+        }
+        None => {
+            let mut new_entries = entries.to_vec();
+            new_entries.push(entry);
+            new_entries
+        }
+    }
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Schedule {
+    group_id: String,
+    entries: Vec<Entry>,
 }

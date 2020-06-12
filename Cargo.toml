@@ -1,2 +1,2 @@
 [workspace]
-members = ["create_open_schedule", "models"]
+members = ["create_schedule", "models"]
