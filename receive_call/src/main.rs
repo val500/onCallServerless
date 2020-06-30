@@ -1,15 +1,14 @@
 use chrono::Utc;
 use chrono::{DateTime, FixedOffset};
-use lambda_http::{lambda, Body, Body::Text, IntoResponse, Request, RequestExt, Response, http::header::{HeaderValue, CONTENT_TYPE}};
+use lambda_http::{lambda, Body, Body::Text, IntoResponse, Request, Response, http::header::{HeaderValue, CONTENT_TYPE}};
 use lambda_runtime::{error::HandlerError, Context};
 use log::Level::Info;
 use models::schedule::Schedule;
 use serde_json::Value;
-use serde_urlencoded::from_str;
 use simple_logger::init_with_level;
 use std::env;
 fn main() {
-    simple_logger::init_with_level(log::Level::Info).unwrap();
+    init_with_level(Info).unwrap();
     lambda!(handler);
 }
 
