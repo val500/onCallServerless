@@ -1,12 +1,12 @@
-# The name of the service.
 service: rust-lambda
 
-# We want to host the project on AWS using Rust.
 provider:
-    name: aws
-    runtime: rust
-
-    iamRoleStatements:
+  name: aws
+  runtime: rust
+  environment:
+    TABLE_NAME: ${self:custom.tableName}
+  stage: dev
+  iamRoleStatements:
     - Effect: Allow
       Action:
         - dynamodb:DescribeTable
@@ -16,38 +16,48 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
-      Resource: "arn:aws:dynamodb:us-east-2:525480555872:table/OpenSchedule"
+        # Restrict our IAM role permissions to
+        # the specific table for the stage
+      Resource:
+        - "Fn::GetAtt": [ GroupTable, Arn ]
+  logs:
+    restApi: true
+
+plugins:
+    - serverless-rust
+    #  serverless-dotenv-plugin
+    - serverless-localstack
 
 custom:
   rust:
     dockerTag: '0.2.7-rust-1.43.0'
-# To automate building and deployment, we'll use a plugin specifically made for Rust.
-plugins:
-    - serverless-rust
-    - serverless-dotenv-plugin
+  localstack:
+    stages:
+      - local
+    autostart: true
+    lambda:
+      # Enable this flag to improve performance
+      mountCode: True
+  stage: ${opt:stage, self:provider.stage}
+  tableName: ${self:custom.stage}-GroupTable
 
-# This tells the framework to package each function separately with its own container.
 package:
     individually: true
 
-# Here is where we define all our functions (each living in a separate Cargo crate).
 functions:
-    # In this project, we only have one lambda function called `lucky_numbers`.
-    create_open_schedule:
-        # The name of the handler must match the name of the crate (not the actual function defined within).
-        handler: create_schedule
-        
-        # This tells AWS when to trigger our function.
-        events:
-            # The event we're interested in is an incoming HTTP request.
-            - http:
-                  # The function will be called for every POST request that is made
-                  # onto the `/lucky_numbers` endpoint.
-                  path: /create_schedule
-                  method: POST
-    get_schedule:
-      handler: get_schedule
-      events:
-        - http:
-            path: /get_schedule
-            method: GET
+  receive_call:
+    handler: receive_call
+    events:
+      - http:
+          path: /receive_call
+          method: POST
+  test_lambda:
+    handler: test_lambda
+    events:
+      - http:
+          path: /test_lambda
+          method: GET
+
+resources:
+  - ${file(resources/dynamodb-table.yml)}
+  - ${file(resources/cognito_user_pool.yml)}

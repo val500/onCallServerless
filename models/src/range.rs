@@ -1,4 +1,4 @@
-use dynomite::{dynamodb::AttributeValue, Attribute, AttributeError, Item};
+use dynomite::{dynamodb::AttributeValue, Attribute, AttributeError};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 fn option_cmp<T: PartialOrd + Ord>(first: Option<&T>, second: Option<&T>) -> Ordering {
@@ -8,7 +8,7 @@ fn option_cmp<T: PartialOrd + Ord>(first: Option<&T>, second: Option<&T>) -> Ord
             None => Ordering::Less,
         },
         None => match second {
-            Some(o) => Ordering::Greater,
+            Some(_o) => Ordering::Greater,
             None => Ordering::Equal,
         },
     }
