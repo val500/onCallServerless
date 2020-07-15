@@ -215,7 +215,7 @@ impl Schedule {
         let client = DynamoDbClient::new(region);
         client
             .put_item(PutItemInput {
-                table_name: table_name.clone(),
+                table_name,
                 item: self.clone().into(), // <= convert schedule into it's attribute map representation
                 ..PutItemInput::default()
             })
@@ -261,6 +261,7 @@ mod tests {
     use crate::users::User;
     use chrono::{FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Weekday};
     use rusoto_core::Region;
+    use NaiveTime::from_hms;
 
     #[test]
     fn test_schedule() {
@@ -292,17 +293,17 @@ mod tests {
         let june30 = NaiveDate::from_ymd(2020, 6, 7).and_hms(0, 0, 0);
         let june_range = OpenRange::new_open_range(&june1, &Some(june30));
 
-        let everyday9 = TimeOfDay::new_tod(NaiveTime::from_hms(9, 0, 0), None);
-        let everyday5 = TimeOfDay::new_tod(NaiveTime::from_hms(17, 0, 0), None);
+        let everyday9 = TimeOfDay::new_tod(from_hms(9, 0, 0), None);
+        let everyday5 = TimeOfDay::new_tod(from_hms(17, 0, 0), None);
         let everyday9to5 = TimeOfDayDuration::new_todd(everyday9, everyday5.clone()); //Everyday 9-5
         let slot1 = ScheduleSlot::new_schedule_slot(june_range.clone(), everyday9to5, vec![jeff]);
 
-        let mon12 = TimeOfDay::new_tod(NaiveTime::from_hms(12, 0, 0), Some(Weekday::Mon));
-        let mon10 = TimeOfDay::new_tod(NaiveTime::from_hms(22, 0, 0), Some(Weekday::Mon));
+        let mon12 = TimeOfDay::new_tod(from_hms(12, 0, 0), Some(Weekday::Mon));
+        let mon10 = TimeOfDay::new_tod(from_hms(22, 0, 0), Some(Weekday::Mon));
         let mon1210 = TimeOfDayDuration::new_todd(mon12, mon10); //Mon 12-10pm
         let slot2 = ScheduleSlot::new_schedule_slot(june_range.clone(), mon1210, vec![tobias]);
 
-        let everyday10 = TimeOfDay::new_tod(NaiveTime::from_hms(22, 0, 0), None);
+        let everyday10 = TimeOfDay::new_tod(from_hms(22, 0, 0), None);
         let everyday510 = TimeOfDayDuration::new_todd(everyday5, everyday10); //Everyday 5-10
         let slot3 = ScheduleSlot::new_schedule_slot(
             june_range.clone(),
@@ -310,8 +311,8 @@ mod tests {
             vec![test_guy, test_guy2.clone()],
         );
 
-        let tue9 = TimeOfDay::new_tod(NaiveTime::from_hms(9, 0, 0), Some(Weekday::Tue));
-        let tue5 = TimeOfDay::new_tod(NaiveTime::from_hms(17, 0, 0), Some(Weekday::Tue));
+        let tue9 = TimeOfDay::new_tod(from_hms(9, 0, 0), Some(Weekday::Tue));
+        let tue5 = TimeOfDay::new_tod(from_hms(17, 0, 0), Some(Weekday::Tue));
         let tue9to5 = TimeOfDayDuration::new_todd(tue9, tue5); //Tue 9-5
         let slot4 = ScheduleSlot::new_schedule_slot(june_range.clone(), tue9to5, vec![test_guy2]);
         let est = FixedOffset::east(-4 * 3600);
