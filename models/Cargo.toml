@@ -15,3 +15,4 @@ tokio = { version = "0.2", features = ["rt-core"] }
 rusoto_core = { version = "0.44" } 
 again = "0.1.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
+rusoto_sqs = { version = "0.44.0" }

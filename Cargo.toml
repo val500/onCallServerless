@@ -1,2 +1,2 @@
 [workspace]
-members = ["models", "receive_call", "test_lambda"]
+members = ["models", "receive_call", "test_lambda", "receive_message"]

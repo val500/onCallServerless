@@ -1,0 +1,19 @@
+[package]
+name = "receive_message"
+version = "0.1.0"
+authors = ["val500 <varun.valada@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lambda_runtime = "0.2.1"
+lambda_http = { version = "0.1.1" }
+log = "0.4.8"
+simple_logger = "1.6.0"
+aws_lambda_events = "0.3.0"
+models = { path = "../models" }
+rusoto_core = "0.44"
+rusoto_sqs = "0.44.0"
+tokio = { version = "0.2", features = ["rt-core"] }
+
